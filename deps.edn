@@ -1,0 +1,31 @@
+{:paths ["src" "resources"]
+ :deps {org.clojure/clojure {:mvn/version "1.11.0-rc1"}
+        metosin/malli {:mvn/version "0.8.3"}}
+ :aliases {:test {:extra-paths ["test"]
+                  :extra-deps {lambdaisland/kaocha {:mvn/version "1.63.998"}}}
+           :cljs-test-runner {:extra-deps {olical/cljs-test-runner {:mvn/version "3.8.0"}}
+                              :extra-paths ["test" "cljs-test-runner-out/gen"]
+                              :main-opts ["-m" "cljs-test-runner.main" "-d" "test"]}
+           :build {:deps {io.github.clojure/tools.build {:git/tag "v0.7.2" :git/sha "e6ff67c"}}
+                   :ns-default build}
+           :shadow {:extra-paths ["app"]
+                    :extra-deps {thheller/shadow-cljs {:mvn/version "2.17.5"}}}
+           :jar {:extra-deps {pack/pack.alpha
+                              {:git/url "https://github.com/juxt/pack.alpha.git"
+                               :sha "b093f79420fef019faf62a75b888b5e10f4e8cc9"}}
+                 :main-opts ["-m" "mach.pack.alpha.skinny" "--no-libs"
+                             "--project-path" "kakkonen.jar"]}
+           :deploy {:extra-deps {deps-deploy/deps-deploy {:mvn/version "RELEASE"}}
+                    :main-opts ["-m" "deps-deploy.deps-deploy" "deploy"
+                                "kakkonen.jar"]}
+           :install {:extra-deps {deps-deploy/deps-deploy {:mvn/version "RELEASE"}}
+                     :main-opts ["-m" "deps-deploy.deps-deploy" "install"
+                                 "kakkonen.jar"]}
+           :perf {:extra-paths ["perf"]
+                  :extra-deps {criterium/criterium {:mvn/version "0.4.6"}
+                               com.clojure-goes-fast/clj-async-profiler {:mvn/version "0.5.1"}}
+                  :jvm-opts ["-server"
+                             "-Xmx4096m"
+                             "-Dclojure.compiler.direct-linking=true"]}
+           :clojure-10 {:extra-deps {org.clojure/clojure {:mvn/version "1.10.3"}}}
+           :clojure-11 {}}}
