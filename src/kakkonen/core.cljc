@@ -23,12 +23,10 @@
 (def Key (m/schema :qualified-keyword))
 (def Data (m/schema [:maybe :map]))
 (def Event (m/schema [:tuple Key Data]))
-(def Options (m/schema [:maybe :map]))
 (def Context (m/schema [:maybe :map]))
 (def Response (m/schema :any))
 (def Handler (m/schema [:=> [:cat Env Context Event] Response]))
 (def Action (m/schema [:map {:closed true} [:handler {:optional true} Handler]]))
-(def Mode (m/schema [:enum :invoke :check :validate]))
 
 ;;
 ;; Impl
