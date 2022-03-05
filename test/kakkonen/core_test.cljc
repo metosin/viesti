@@ -79,8 +79,8 @@
                       (k/-documentation-module)
                       (k/-cqrs-module)
                       (k/-permissions-module {:permissions #{:test/read :test/write}
-                                               :required false
-                                               :get-permissions #(-> % :user :permissions (or #{}))})
+                                              :required false
+                                              :get-permissions #(-> % :user :permissions (or #{}))})
                       (k/-validate-input-module)
                       (k/-validate-output-module)
                       (k/-invoke-handler-module)]})]

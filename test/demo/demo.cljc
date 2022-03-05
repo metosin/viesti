@@ -87,16 +87,16 @@
  [:system/available-actions])
 
 (comment
- (! [:pizza/list])
- (! [:pizza/listz])
- (! [:pizza/get {:id 100}])
- (! [:pizza/add {:name "quatro"
-                 :size "L"
-                 :price 120
-                 :origin {:country "Italy"}}])
- (! [:pizza/add {:name "quatro"}])
- (! [:pizza/clear])
- (! [:pizza/nop])
- (! [:system/actions])
- (! [:system/stop])
- (! [:system/available-actions]))
+  (! [:pizza/list])
+  (! [:pizza/listz])
+  (! [:pizza/get {:id 100}])
+  (! [:pizza/add {:name "quatro"
+                  :size "L"
+                  :price 120
+                  :origin {:country "Italy"}}])
+  (! [:pizza/add {:name "quatro"}])
+  (! [:pizza/clear])
+  (! [:pizza/nop])
+  (! [:system/actions])
+  (! [:system/stop])
+  (! [:system/available-actions]))

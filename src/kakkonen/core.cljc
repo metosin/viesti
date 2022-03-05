@@ -1,7 +1,7 @@
 (ns kakkonen.core
-  (:require [malli.core :as m]
-            [malli.util :as mu]
-            [clojure.set :as set]))
+  (:require [clojure.set :as set]
+            [malli.core :as m]
+            [malli.util :as mu]))
 
 ;;
 ;; Protocols
