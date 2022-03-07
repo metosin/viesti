@@ -7,6 +7,10 @@ help: ## Show this help
 	@fgrep -h "##" $(MAKEFILE_LIST) | \
 	fgrep -v fgrep | sed -e 's/## */##/' | column -t -s##
 
+.PHONY: nrepl
+nrepl: ## Nrepl
+	@clj -Mtest -m nrepl.cmdline -i -C
+
 .PHONY: format
 format: ## Reformat clj(s)
 	@clojure-lsp format

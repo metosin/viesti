@@ -23,6 +23,7 @@
 (def Key (m/schema :qualified-keyword))
 (def Data (m/schema [:maybe :map]))
 (def Event (m/schema [:tuple Key Data]))
+(def MapEvent (m/schema [:map [:action Key] [:data Data]]))
 (def Context (m/schema [:maybe :map]))
 (def Response (m/schema :any))
 (def Handler (m/schema [:=> [:cat Env Context Event] Response]))
@@ -40,7 +41,7 @@
 
 (defn -compile [action data {:keys [modules] :as options}]
   (reduce (fn [data {:keys [compile]}] (or (if compile (compile action data options)) data))
-          (-> data (update :handler (fnil identity -nil-handler)) (assoc :checker -nil-handler))
+          (update data :handler (fnil identity -nil-handler))
           (reverse modules)))
 
 (defn -ctx [ctx dispatcher validate invoke]
@@ -74,30 +75,36 @@
   {:name '-cqrs-module
    :schema [:map [:type [:enum :command :query]]]})
 
-(defn -documentation-module []
-  {:name '-documentation-module
-   :schema [:map [:description {:optional true} :string]]})
+(defn -documentation-module
+  ([] (-documentation-module nil))
+  ([{:keys [required]}]
+   {:name '-documentation-module
+    :schema [:map [:description (when-not required {:optional true}) :string]]}))
 
 (defn -validate-input-module []
   {:name '-validate-input-module
    :schema [:map [:input {:optional true} :any]]
    :compile (fn [key {:keys [input handler] :as data} _]
               (when input
-                (let [validate (m/validator input)
-                      explain (m/explainer input)
+                (let [schema (m/schema input)
+                      validate (m/validator schema)
+                      explain (m/explainer schema)
                       handler (fn [env ctx data]
                                 (when (and (::validate ctx) (not (validate data)))
                                   (-fail! ::input-schema-error {:key key, :explanation (explain data)}))
                                 (handler env ctx data))]
-                  (assoc data :handler handler))))})
+                  (-> data
+                      (assoc :handler handler)
+                      (assoc :input (m/form schema))))))})
 
 (defn -validate-output-module []
   {:name '-validate-output-module
    :schema [:map [:output {:optional true} :any]]
    :compile (fn [key {:keys [output handler] :as data} _]
               (when output
-                (let [validate (m/validator output)
-                      explain (m/explainer output)
+                (let [schema (m/schema output)
+                      validate (m/validator schema)
+                      explain (m/explainer schema)
                       handler (fn [env ctx data]
                                 (if (::invoke ctx)
                                   (let [response (handler env ctx data)]
@@ -105,7 +112,9 @@
                                       (-fail! ::output-schema-error {:key key, :explanation (explain response)}))
                                     response)
                                   (handler env ctx data)))]
-                  (assoc data :handler handler))))})
+                  (-> data
+                      (assoc :handler handler)
+                      (assoc :output (m/form schema))))))})
 
 (defn -permissions-module [{:keys [required permissions get-permissions] :or {get-permissions :permissions}}]
   {:name '-permissions-module
@@ -156,7 +165,7 @@
    (let [schema (->> modules (keep :schema) (reduce mu/merge Action))]
      (when-let [explanation (m/explain [:map-of Key schema] actions)]
        (-fail! ::invalid-actions {:explanation explanation}))
-     (let [compiled (reduce-kv (fn [acc key data] (assoc acc key (-compile key data options))) {} actions)
+     (let [actions (reduce-kv (fn [acc key data] (assoc acc key (-compile key data options))) {} actions)
            types (set (keys actions))]
        (reify Dispatcher
          (-types [_] types)
@@ -164,12 +173,12 @@
          (-schema [_] schema)
          (-options [_] options)
          (-check [_ env ctx [key data]]
-           (if-let [action (compiled key)]
+           (if-let [action (actions key)]
              (let [handler (:handler action)]
                (try (handler env ctx data) (catch #?(:clj Exception, :cljs js/Error) e (ex-data e))))
              (-fail! ::invalid-action {:type key, :types types})))
          (-dispatch [_ env ctx [key data]]
-           (if-let [action (compiled key)]
+           (if-let [action (actions key)]
              (let [handler (:handler action)]
                (handler env ctx data))
              (-fail! ::invalid-action {:type key, :types types}))))))))
