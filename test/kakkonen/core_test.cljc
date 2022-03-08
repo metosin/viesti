@@ -27,10 +27,8 @@
 
   (testing "actions"
     (let [actions (k/-actions d)]
-      (is (= #{::inc ::plus ::get ::nop}
-             (set (keys actions))))
-      (doseq [[k {:keys [handler]}] data]
-        (is (= handler (-> k actions :handler))))))
+      (is (= #{::inc ::plus ::get ::nop} (set (keys actions))))
+      (doseq [[k _] data] (is (-> k actions :handler)))))
 
   (testing "dispatching"
     (let [env {:value (atom 0)}
@@ -120,12 +118,10 @@
                (k/dispatch d nil ctx [::write]))))
 
         (testing "list actions"
-          (is (= {::available {:type :query}
-                  ::list {:type :query}
-                  ::read {:permissions #{:test/read}
-                          :type :query}
-                  ::write {:permissions #{:test/write}
-                           :type :query}}
+          (is (= {::available {:type :query, ::k/key ::available}
+                  ::list {:type :query, ::k/key ::list}
+                  ::read {:type :query, ::k/key ::read, :permissions #{:test/read}}
+                  ::write {:type :query, ::k/key ::write, :permissions #{:test/write}}}
                  (k/dispatch d nil ctx [::list]))))
 
         (testing "list available commands"
