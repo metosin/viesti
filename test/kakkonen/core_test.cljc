@@ -36,17 +36,21 @@
 
       (testing "succesfull"
         (is (! [::inc]))
+        (is (! {:type ::inc}))
+
         (is (! [::plus 3]))
-        (is (! [::inc]))
-        (is (= 5 (! [::get]))))
+        (is (! {:type ::plus :data 3}))
+
+        (is (= 8 (! [::get])))
+        (is (= 8 (! {:type ::get}))))
 
       (testing "invalid key throws"
-        (is (thrown?
-             #?(:clj Exception, :cljs js/Error)
-             (! [::invalid]))))
+        (is (thrown? #?(:clj Exception, :cljs js/Error) (! [::invalid])))
+        (is (thrown? #?(:clj Exception, :cljs js/Error) (! {:type ::invalid}))))
 
       (testing "no handler does not throw"
-        (is (nil? (! [::nop])))))))
+        (is (nil? (! [::nop])))
+        (is (nil? (! {:type ::nop})))))))
 
 (deftest dispatcher-creation-test
 

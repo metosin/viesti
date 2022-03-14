@@ -47,7 +47,7 @@
 (defn -ctx [ctx dispatcher validate invoke]
   (-> ctx (assoc ::dispatcher dispatcher) (assoc ::validate validate) (assoc ::invoke invoke)))
 
-(defn -event [data] (if (map? data) [(:type data) (:data data)] data))
+(defn -event [data] (if (map? data) data {:type (first data), :data (second data)}))
 
 (defn -proxy [d f]
   (reify Dispatcher
@@ -179,17 +179,17 @@
          (-schema [_] schema)
          (-options [_] options)
          (-check [_ env ctx event]
-           (let [[key data] (-event event)]
-             (if-let [action (actions key)]
+           (let [{:keys [type data]} (-event event)]
+             (if-let [action (actions type)]
                (let [handler (:handler action)]
                  (try (handler env ctx data) (catch #?(:clj Exception, :cljs js/Error) e (ex-data e))))
-               (-fail! ::invalid-action {:type key, :types types}))))
+               (-fail! ::invalid-action {:type type, :types types}))))
          (-dispatch [_ env ctx event]
-           (let [[key data] (-event event)]
-             (if-let [action (actions key)]
+           (let [{:keys [type data]} (-event event)]
+             (if-let [action (actions type)]
                (let [handler (:handler action)]
                  (handler env ctx data))
-               (-fail! ::invalid-action {:type key, :types types})))))))))
+               (-fail! ::invalid-action {:type type, :types types})))))))))
 
 (defn check [dispatcher env ctx event] (-check dispatcher env (-ctx ctx dispatcher false false) event))
 (defn dry-run [dispatcher env ctx event] (-check dispatcher env (-ctx ctx dispatcher true false) event))
