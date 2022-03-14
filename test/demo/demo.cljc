@@ -59,16 +59,22 @@
               (k/-documentation-module)
               (k/-cqrs-module)
               ;; guards
-              (k/-permissions-module {:permissions #{:pizza/read :pizza/write :system/read :system/write}
-                                      :get-permissions #(-> % :user :permissions (or #{}))})
+              (k/-permissions-module
+               {:permissions #{:pizza/read :pizza/write :system/read :system/write}
+                :get-permissions #(-> % :user :permissions (or #{}))})
               (k/-validate-input-module)
               (k/-validate-output-module)
               ;; invoke
               (k/-invoke-handler-module)]}))
 
-(defn ! [event] (k/dispatch dispatcher nil {:user {:permissions #{:pizza/read :pizza/write :system/read}}} event))
+(defn ! [event]
+  (k/dispatch
+   dispatcher
+   nil
+   {:user {:permissions #{:pizza/read :pizza/write :system/read}}}
+   event))
 
-(k/check
+(k/dry-run
  dispatcher
  nil
  {:user {:permissions #{:pizza/read :system/read}}}
@@ -99,14 +105,19 @@
  (! [:pizza/nop])
  (! [:system/actions])
  (! [:system/stop])
- (! [:system/available-actions]))
+ (! [:system/available-actions])
+
+ (! [:app/query
+     [[:pizza/list]
+      [:pizza/list]]]))
 
 (comment
  (require '[kakkonen.plantuml :as plantuml])
 
- (plantuml/transform
-  dispatcher
-  {:user {:description "Normal User"
-          :permissions #{:pizza/read :system/read}}
-   :admin {:description "System Admin"
-           :permissions #{:pizza/read :pizza/write :system/read}}}))
+ (println
+  (plantuml/transform
+   dispatcher
+   {:user {:description "Normal User"
+           :permissions #{:pizza/read :system/read}}
+    :admin {:description "System Admin"
+            :permissions #{:pizza/read :pizza/write :system/read}}})))

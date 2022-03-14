@@ -47,6 +47,8 @@
 (defn -ctx [ctx dispatcher validate invoke]
   (-> ctx (assoc ::dispatcher dispatcher) (assoc ::validate validate) (assoc ::invoke invoke)))
 
+(defn -event [data] (if (map? data) [(:type data) (:data data)] data))
+
 (defn -proxy [d f]
   (reify Dispatcher
     (-types [_] (-types d))
@@ -60,12 +62,14 @@
 ;; Modules
 ;;
 
-(defn -invoke-handler-module []
-  {:name '-invoke-handler-module
-   :compile (fn [_ {:keys [handler] :as data} _]
-              (assoc data :handler (fn [env ctx data]
-                                     (let [f (if (::invoke ctx) handler -nil-handler)]
-                                       (f env ctx data)))))})
+(defn -invoke-handler-module
+  ([] (-invoke-handler-module nil))
+  ([{:keys [dispatch]}]
+   {:name '-invoke-handler-module
+    :compile (fn [_ {:keys [handler] :as data} _]
+               (assoc data :handler (fn [env ctx data]
+                                      (let [f (if (::invoke ctx) (or dispatch handler) -nil-handler)]
+                                        (f env ctx data)))))}))
 
 (defn -assoc-key-module []
   {:name '-assoc-key-module
@@ -159,6 +163,8 @@
 ;; Public API
 ;;
 
+;; TODO: map-first dispatching
+;; TODO: naming of things
 (defn dispatcher
   ([actions] (dispatcher actions (-default-options)))
   ([actions {:keys [modules] :as options}]
@@ -172,16 +178,18 @@
          (-actions [_] actions)
          (-schema [_] schema)
          (-options [_] options)
-         (-check [_ env ctx [key data]]
-           (if-let [action (actions key)]
-             (let [handler (:handler action)]
-               (try (handler env ctx data) (catch #?(:clj Exception, :cljs js/Error) e (ex-data e))))
-             (-fail! ::invalid-action {:type key, :types types})))
-         (-dispatch [_ env ctx [key data]]
-           (if-let [action (actions key)]
-             (let [handler (:handler action)]
-               (handler env ctx data))
-             (-fail! ::invalid-action {:type key, :types types}))))))))
+         (-check [_ env ctx event]
+           (let [[key data] (-event event)]
+             (if-let [action (actions key)]
+               (let [handler (:handler action)]
+                 (try (handler env ctx data) (catch #?(:clj Exception, :cljs js/Error) e (ex-data e))))
+               (-fail! ::invalid-action {:type key, :types types}))))
+         (-dispatch [_ env ctx event]
+           (let [[key data] (-event event)]
+             (if-let [action (actions key)]
+               (let [handler (:handler action)]
+                 (handler env ctx data))
+               (-fail! ::invalid-action {:type key, :types types})))))))))
 
 (defn check [dispatcher env ctx event] (-check dispatcher env (-ctx ctx dispatcher false false) event))
 (defn dry-run [dispatcher env ctx event] (-check dispatcher env (-ctx ctx dispatcher true false) event))
