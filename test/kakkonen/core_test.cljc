@@ -22,8 +22,7 @@
            (m/form (k/-schema d)))))
 
   (testing "types"
-    (is (= #{::inc ::plus ::get ::nop}
-           (k/-types d))))
+    (is (= #{::inc ::plus ::get ::nop} (k/-types d))))
 
   (testing "actions"
     (let [actions (k/-actions d)]
