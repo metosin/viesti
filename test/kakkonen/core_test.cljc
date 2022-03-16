@@ -33,7 +33,7 @@
     (let [env {:value (atom 0)}
           ! (fn [event] (k/dispatch d env nil event))]
 
-      (testing "succesfull"
+      (testing "succesful"
         (is (! [::inc]))
         (is (! {:type ::inc}))
 
