@@ -14,15 +14,15 @@
 
 (def dispatcher
   (k/dispatcher
-   {:user/login {:type :command}
-    :pizza/list {:type :query, :permissions #{:pizza/read}}
-    :pizza/get {:type :query, :permissions #{:pizza/read}}
-    :pizza/add {:type :command, :permissions #{:pizza/write}}
-    :pizza/clear {:type :command, :permissions #{:pizza/write}}
-    :system/actions {:type :query, :permissions #{:system/read}, :handler k/-actions-handler}
-    :system/available-actions {:type :query, :permissions #{:system/read}, :handler k/-available-actions-handler}}
-   {:modules [(k/-assoc-key-module)
-              (k/-cqrs-module)
+   {:user/login {:kind :command}
+    :pizza/list {:kind :query, :permissions #{:pizza/read}}
+    :pizza/get {:kind :query, :permissions #{:pizza/read}}
+    :pizza/add {:kind :command, :permissions #{:pizza/write}}
+    :pizza/clear {:kind :command, :permissions #{:pizza/write}}
+    :system/actions {:kind :query, :permissions #{:system/read}, :handler k/-actions-handler}
+    :system/available-actions {:kind :query, :permissions #{:system/read}, :handler k/-available-actions-handler}}
+   {:modules [(k/-assoc-type-module)
+              (k/-kind-module {:values #{:command :query}})
               (k/-permissions-module
                {:permissions (->> roles (mapcat (comp :permissions val)) (set))})
               (k/-invoke-handler-module)]}))

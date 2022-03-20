@@ -20,14 +20,14 @@
 ;;
 
 (def Env (m/schema [:maybe :map]))
-(def Key (m/schema :qualified-keyword))
+(def Type (m/schema :qualified-keyword))
 (def Data (m/schema [:maybe :map]))
-(def Event (m/schema [:tuple Key Data]))
-(def MapEvent (m/schema [:map [:action Key] [:data Data]]))
+(def Message (m/schema [:tuple Type Data]))
+(def MapMessage (m/schema [:map [:type Type] [:data Data]]))
 (def Context (m/schema [:maybe :map]))
 (def Response (m/schema :any))
-(def Handler (m/schema [:=> [:cat Env Context Event] Response]))
-(def Action (m/schema [:map {:closed true} [:handler {:optional true} Handler]]))
+(def Handle (m/schema [:=> [:cat Env Context Message] Response]))
+(def Handler (m/schema [:map {:closed true} [:handler {:optional true} Handle]]))
 
 ;;
 ;; Impl
@@ -39,8 +39,8 @@
 
 (defn -nil-handler [_env _ctx _data])
 
-(defn -compile [action data {:keys [modules] :as options}]
-  (reduce (fn [data {:keys [compile]}] (or (if compile (compile action data options)) data))
+(defn -compile [type data {:keys [modules] :as options}]
+  (reduce (fn [data {:keys [compile]}] (or (if compile (compile type data options)) data))
           (update data :handler (fnil identity -nil-handler))
           (reverse modules)))
 
@@ -71,13 +71,13 @@
                                       (let [f (if (::invoke ctx) (or dispatch handler) -nil-handler)]
                                         (f env ctx data)))))}))
 
-(defn -assoc-key-module []
-  {:name '-assoc-key-module
-   :compile (fn [action data _] (assoc data ::key action))})
+(defn -assoc-type-module []
+  {:name '-assoc-type-module
+   :compile (fn [type data _] (assoc data ::type type))})
 
-(defn -cqrs-module []
-  {:name '-cqrs-module
-   :schema [:map [:type [:enum :command :query]]]})
+(defn -kind-module [{:keys [values]}]
+  {:name '-kind-module
+   :schema [:map [:kind (into [:enum] values)]]})
 
 (defn -documentation-module
   ([] (-documentation-module nil))
@@ -88,14 +88,14 @@
 (defn -validate-input-module []
   {:name '-validate-input-module
    :schema [:map [:input {:optional true} :any]]
-   :compile (fn [key {:keys [input handler] :as data} _]
+   :compile (fn [type {:keys [input handler] :as data} _]
               (when input
                 (let [schema (m/schema input)
                       validate (m/validator schema)
                       explain (m/explainer schema)
                       handler (fn [env ctx data]
                                 (when (and (::validate ctx) (not (validate data)))
-                                  (-fail! ::input-schema-error {:key key, :explanation (explain data)}))
+                                  (-fail! ::input-schema-error {:type type, :explanation (explain data)}))
                                 (handler env ctx data))]
                   (-> data
                       (assoc :handler handler)
@@ -104,7 +104,7 @@
 (defn -validate-output-module []
   {:name '-validate-output-module
    :schema [:map [:output {:optional true} :any]]
-   :compile (fn [key {:keys [output handler] :as data} _]
+   :compile (fn [type {:keys [output handler] :as data} _]
               (when output
                 (let [schema (m/schema output)
                       validate (m/validator schema)
@@ -113,7 +113,7 @@
                                 (if (::invoke ctx)
                                   (let [response (handler env ctx data)]
                                     (when-not (validate response)
-                                      (-fail! ::output-schema-error {:key key, :explanation (explain response)}))
+                                      (-fail! ::output-schema-error {:type type, :explanation (explain response)}))
                                     response)
                                   (handler env ctx data)))]
                   (-> data
@@ -123,7 +123,7 @@
 (defn -permissions-module [{:keys [required permissions get-permissions] :or {get-permissions :permissions}}]
   {:name '-permissions-module
    :schema [:map [:permissions (if-not required {:optional true}) [:set (into [:enum] permissions)]]]
-   :compile (fn [key {:keys [handler permissions] :as data} _]
+   :compile (fn [type {:keys [handler permissions] :as data} _]
               (when permissions
                 (let [handler (fn [env ctx data]
                                 (let [user-permissions (get-permissions ctx)]
@@ -132,7 +132,7 @@
                                       (-fail! ::missing-permissions {:permissions user-permissions
                                                                      :expected permissions
                                                                      :missing missing
-                                                                     :key key})
+                                                                     :type type})
                                       (handler env ctx data)))))]
                   (assoc data :handler handler))))})
 
@@ -141,19 +141,19 @@
 ;;
 
 (defn -actions-handler [_ ctx _]
-  (reduce-kv (fn [acc k v] (assoc acc k (dissoc v :handler))) {} (-actions (::dispatcher ctx))))
+  (reduce-kv (fn [acc type handler] (assoc acc type (dissoc handler :handler))) {} (-actions (::dispatcher ctx))))
 
 (defn -available-actions-handler [env {:keys [::dispatcher] :as ctx} _]
   (reduce-kv
-   (fn [acc k data]
-     (assoc acc k (-check dispatcher env (-ctx ctx dispatcher false false) [k data]))) {} (-actions dispatcher)))
+   (fn [acc type data]
+     (assoc acc type (-check dispatcher env (-ctx ctx dispatcher false false) [type data]))) {} (-actions dispatcher)))
 
 ;;
 ;; Defaults
 ;;
 
 (defn -default-options []
-  {:modules [(-assoc-key-module)
+  {:modules [(-assoc-type-module)
              (-documentation-module)
              (-validate-input-module)
              (-validate-output-module)
@@ -168,8 +168,8 @@
 (defn dispatcher
   ([actions] (dispatcher actions (-default-options)))
   ([actions {:keys [modules] :as options}]
-   (let [schema (->> modules (keep :schema) (reduce mu/merge Action))]
-     (when-let [explanation (m/explain [:map-of Key schema] actions)]
+   (let [schema (->> modules (keep :schema) (reduce mu/merge Handler))]
+     (when-let [explanation (m/explain [:map-of Type schema] actions)]
        (-fail! ::invalid-actions {:explanation explanation}))
      (let [actions (reduce-kv (fn [acc key data] (assoc acc key (-compile key data options))) {} actions)
            types (set (keys actions))]

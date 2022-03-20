@@ -15,7 +15,7 @@
   (testing "accumulated schema"
     (is (= (m/form [:map
                     {:closed true}
-                    [:handler {:optional true} k/Handler]
+                    [:handler {:optional true} k/Handle]
                     [:description {:optional true} :string]
                     [:input {:optional true} :any]
                     [:output {:optional true} :any]])
@@ -66,19 +66,19 @@
 
 (deftest custom-dispatcher-test
   (let [d (k/dispatcher
-           {::read {:type :query
+           {::read {:kind :query
                     :permissions #{:test/read}
                     :handler (fn [_ _ _] "read")}
-            ::write {:type :query
+            ::write {:kind :query
                      :permissions #{:test/write}
                      :handler (fn [_ _ _] "write")}
-            ::list {:type :query
+            ::list {:kind :query
                     :handler k/-actions-handler}
-            ::available {:type :query
+            ::available {:kind :query
                          :handler k/-available-actions-handler}}
-           {:modules [(k/-assoc-key-module)
+           {:modules [(k/-assoc-type-module)
                       (k/-documentation-module)
-                      (k/-cqrs-module)
+                      (k/-kind-module {:values #{:command :query}})
                       (k/-permissions-module {:permissions #{:test/read :test/write}
                                               :required false
                                               :get-permissions #(-> % :user :permissions (or #{}))})
@@ -89,9 +89,9 @@
     (testing "accumulated schema"
       (is (= (m/form [:map
                       {:closed true}
-                      [:handler {:optional true} k/Handler]
+                      [:handler {:optional true} k/Handle]
                       [:description {:optional true} :string]
-                      [:type [:enum :command :query]]
+                      [:kind [:enum :command :query]]
                       [:permissions {:optional true} [:set [:enum :test/read :test/write]]]
                       [:input {:optional true} :any]
                       [:output {:optional true} :any]])
@@ -105,13 +105,13 @@
           (is (= "read" (k/dispatch d nil ctx [::read]))))
         (testing "can't dispatch to write"
           (is (= {:data {:expected #{:test/write}
-                         :key ::write
+                         :type ::write
                          :missing #{:test/write}
                          :permissions #{:test/read}}
                   :type ::k/missing-permissions}
                  (k/check d nil ctx [::write])))
           (is (= {:data {:expected #{:test/write}
-                         :key ::write
+                         :type ::write
                          :missing #{:test/write}
                          :permissions #{:test/read}}
                   :type ::k/missing-permissions}
@@ -121,10 +121,10 @@
                (k/dispatch d nil ctx [::write]))))
 
         (testing "list actions"
-          (is (= {::available {:type :query, ::k/key ::available}
-                  ::list {:type :query, ::k/key ::list}
-                  ::read {:type :query, ::k/key ::read, :permissions #{:test/read}}
-                  ::write {:type :query, ::k/key ::write, :permissions #{:test/write}}}
+          (is (= {::available {:kind :query, ::k/type ::available}
+                  ::list {:kind :query, ::k/type ::list}
+                  ::read {:kind :query, ::k/type ::read, :permissions #{:test/read}}
+                  ::write {:kind :query, ::k/type ::write, :permissions #{:test/write}}}
                  (k/dispatch d nil ctx [::list]))))
 
         (testing "list available commands"
@@ -132,7 +132,7 @@
                   ::list nil
                   ::read nil
                   ::write {:data {:expected #{:test/write}
-                                  :key ::write
+                                  :type ::write
                                   :missing #{:test/write}
                                   :permissions #{:test/read}}
                            :type ::k/missing-permissions}}

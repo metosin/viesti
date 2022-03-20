@@ -15,9 +15,9 @@
           (pretty/-block "No handler for type:" (v/-visit type p) p) :break :break
           (pretty/-block "Action:" (v/-visit action p) p)]})
 
-(defmethod v/-format ::k/missing-permissions [_ _ {:keys [key permissions expected missing]} p]
+(defmethod v/-format ::k/missing-permissions [_ _ {:keys [type permissions expected missing]} p]
   {:body [:group
-          (pretty/-block "With action:" (v/-visit key p) p) :break :break
+          (pretty/-block "With action:" (v/-visit type p) p) :break :break
           (pretty/-block "Missing permission:" (v/-visit missing p) p) :break :break
           [:group (v/-text "Found " p) (v/-visit permissions p) (v/-text ", expected " p) (v/-visit expected p)]]})
 
