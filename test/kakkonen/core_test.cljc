@@ -11,6 +11,12 @@
 
 (def d (k/dispatcher data))
 
+(deftest -fail-test
+  (try
+    (k/-fail! ::k/kikka)
+    (catch #?(:clj Exception, :cljs js/Error) e
+      (is (k/-fail? e)))))
+
 (deftest dispatcher-test
   (testing "accumulated schema"
     (is (= (m/form [:map

@@ -111,7 +111,7 @@
 
  (spit
   ".cpcache/pizza.puml"
-  ((requiring-resolve 'plantuml/transform)
+  ((requiring-resolve 'kakkonen.plantuml/transform)
    dispatcher
    {:user {:description "Normal User"
            :permissions #{:pizza/read :system/read}}
