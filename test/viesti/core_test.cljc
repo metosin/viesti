@@ -1,7 +1,7 @@
-(ns kakkonen.core-test
+(ns viesti.core-test
   (:require [clojure.test :refer [deftest is testing]]
-            [kakkonen.core :as k]
-            [malli.core :as m]))
+            [malli.core :as m]
+            [viesti.core :as v]))
 
 (def data
   {::inc {:handler (fn [{:keys [value]} _ _] (swap! value (fnil inc 0)))}
@@ -9,35 +9,35 @@
    ::get {:handler (fn [{:keys [value]} _ _] @value)}
    ::nop {}})
 
-(def d (k/dispatcher data))
+(def d (v/dispatcher data))
 
 (deftest -fail-test
   (try
-    (k/-fail! ::k/kikka)
+    (v/-fail! ::v/kikka)
     (catch #?(:clj Exception, :cljs js/Error) e
-      (is (k/-fail? e)))))
+      (is (= ::v/kikka (-> e ex-data :type))))))
 
 (deftest dispatcher-test
   (testing "accumulated schema"
     (is (= (m/form [:map
                     {:closed true}
-                    [:handler {:optional true} k/Handle]
+                    [:handler {:optional true} v/Handle]
                     [:description {:optional true} :string]
                     [:input {:optional true} :any]
                     [:output {:optional true} :any]])
-           (m/form (k/-schema d)))))
+           (m/form (v/-schema d)))))
 
   (testing "types"
-    (is (= #{::inc ::plus ::get ::nop} (k/-types d))))
+    (is (= #{::inc ::plus ::get ::nop} (v/-types d))))
 
   (testing "actions"
-    (let [actions (k/-actions d)]
+    (let [actions (v/-actions d)]
       (is (= #{::inc ::plus ::get ::nop} (set (keys actions))))
       (doseq [[k _] data] (is (-> k actions :handler)))))
 
   (testing "dispatching"
     (let [env {:value (atom 0)}
-          ! (fn [event] (k/dispatch d env nil event))]
+          ! (fn [event] (v/dispatch d env nil event))]
 
       (testing "succesful"
         (is (! [::inc]))
@@ -60,18 +60,18 @@
 (deftest dispatcher-creation-test
 
   (testing "no actions are required"
-    (is (k/dispatcher {})))
+    (is (v/dispatcher {})))
 
   (testing "handler is not required"
-    (is (k/dispatcher {::inc {}})))
+    (is (v/dispatcher {::inc {}})))
 
   (testing "extra keys are not accepted"
     (is (thrown?
          #?(:clj Exception, :cljs js/Error)
-         (k/dispatcher {::inc {:title "123"}})))))
+         (v/dispatcher {::inc {:title "123"}})))))
 
 (deftest custom-dispatcher-test
-  (let [d (k/dispatcher
+  (let [d (v/dispatcher
            {::read {:kind :query
                     :permissions #{:test/read}
                     :handler (fn [_ _ _] "read")}
@@ -79,59 +79,59 @@
                      :permissions #{:test/write}
                      :handler (fn [_ _ _] "write")}
             ::list {:kind :query
-                    :handler k/-actions-handler}
+                    :handler v/-actions-handler}
             ::available {:kind :query
-                         :handler k/-available-actions-handler}}
-           {:modules [(k/-assoc-type-module)
-                      (k/-documentation-module)
-                      (k/-kind-module {:values #{:command :query}})
-                      (k/-permissions-module {:permissions #{:test/read :test/write}
+                         :handler v/-available-actions-handler}}
+           {:modules [(v/-assoc-type-module)
+                      (v/-documentation-module)
+                      (v/-kind-module {:values #{:command :query}})
+                      (v/-permissions-module {:permissions #{:test/read :test/write}
                                               :required false
                                               :get-permissions #(-> % :user :permissions (or #{}))})
-                      (k/-validate-input-module)
-                      (k/-validate-output-module)
-                      (k/-invoke-handler-module)]})]
+                      (v/-validate-input-module)
+                      (v/-validate-output-module)
+                      (v/-invoke-handler-module)]})]
 
     (testing "accumulated schema"
       (is (= (m/form [:map
                       {:closed true}
-                      [:handler {:optional true} k/Handle]
+                      [:handler {:optional true} v/Handle]
                       [:description {:optional true} :string]
                       [:kind [:enum :command :query]]
                       [:permissions {:optional true} [:set [:enum :test/read :test/write]]]
                       [:input {:optional true} :any]
                       [:output {:optional true} :any]])
-             (m/form (k/-schema d)))))
+             (m/form (v/-schema d)))))
 
     (testing "user with read permissions"
       (let [ctx {:user {:permissions #{:test/read}}}]
         (testing "can dispatch to read"
-          (is (nil? (k/check d nil ctx [::read])))
-          (is (nil? (k/dry-run d nil ctx [::read])))
-          (is (= "read" (k/dispatch d nil ctx [::read]))))
+          (is (nil? (v/check d nil ctx [::read])))
+          (is (nil? (v/dry-run d nil ctx [::read])))
+          (is (= "read" (v/dispatch d nil ctx [::read]))))
         (testing "can't dispatch to write"
           (is (= {:data {:expected #{:test/write}
                          :type ::write
                          :missing #{:test/write}
                          :permissions #{:test/read}}
-                  :type ::k/missing-permissions}
-                 (k/check d nil ctx [::write])))
+                  :type ::v/missing-permissions}
+                 (v/check d nil ctx [::write])))
           (is (= {:data {:expected #{:test/write}
                          :type ::write
                          :missing #{:test/write}
                          :permissions #{:test/read}}
-                  :type ::k/missing-permissions}
-                 (k/dry-run d nil ctx [::write])))
+                  :type ::v/missing-permissions}
+                 (v/dry-run d nil ctx [::write])))
           (is (thrown?
                #?(:clj Exception, :cljs js/Error)
-               (k/dispatch d nil ctx [::write]))))
+               (v/dispatch d nil ctx [::write]))))
 
         (testing "list actions"
-          (is (= {::available {:kind :query, ::k/type ::available}
-                  ::list {:kind :query, ::k/type ::list}
-                  ::read {:kind :query, ::k/type ::read, :permissions #{:test/read}}
-                  ::write {:kind :query, ::k/type ::write, :permissions #{:test/write}}}
-                 (k/dispatch d nil ctx [::list]))))
+          (is (= {::available {:kind :query, ::v/type ::available}
+                  ::list {:kind :query, ::v/type ::list}
+                  ::read {:kind :query, ::v/type ::read, :permissions #{:test/read}}
+                  ::write {:kind :query, ::v/type ::write, :permissions #{:test/write}}}
+                 (v/dispatch d nil ctx [::list]))))
 
         (testing "list available commands"
           (is (= {::available nil
@@ -141,5 +141,5 @@
                                   :type ::write
                                   :missing #{:test/write}
                                   :permissions #{:test/read}}
-                           :type ::k/missing-permissions}}
-                 (k/dispatch d nil ctx [::available]))))))))
+                           :type ::v/missing-permissions}}
+                 (v/dispatch d nil ctx [::available]))))))))

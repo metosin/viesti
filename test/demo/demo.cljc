@@ -1,8 +1,8 @@
 (ns demo.pizza
-  (:require [kakkonen.core :as k]
-            [kakkonen.dev :as dev]
-            [malli.generator :as mg]
-            [malli.util :as mu]))
+  (:require [malli.generator :as mg]
+            [malli.util :as mu]
+            [viesti.core :as v]
+            [viesti.dev :as dev]))
 
 (def Pizza
   [:map {:title "pizza"}
@@ -45,48 +45,48 @@
 
     :system/actions {:kind :query
                      :permissions #{:system/read}
-                     :handler k/-actions-handler}
+                     :handler v/-actions-handler}
 
     :system/available-actions {:kind :query
                                :permissions #{:system/read}
-                               :handler k/-available-actions-handler}
+                               :handler v/-available-actions-handler}
 
     :system/stop {:kind :command
                   :permissions #{:system/write}}}
 
    {:modules [;; schema & docs
-              (k/-assoc-type-module)
-              (k/-documentation-module)
-              (k/-kind-module {:values #{:command :query}})
+              (v/-assoc-type-module)
+              (v/-documentation-module)
+              (v/-kind-module {:values #{:command :query}})
               ;; guards
-              (k/-permissions-module
+              (v/-permissions-module
                {:permissions #{:pizza/read :pizza/write :system/read :system/write}
                 :get-permissions #(-> % :user :permissions (or #{}))})
-              (k/-validate-input-module)
-              (k/-validate-output-module)
+              (v/-validate-input-module)
+              (v/-validate-output-module)
               ;; invoke
-              (k/-invoke-handler-module)]}))
+              (v/-invoke-handler-module)]}))
 
 (defn ! [event]
-  (k/dispatch
+  (v/dispatch
    dispatcher
    nil
    {:user {:permissions #{:pizza/read :pizza/write :system/read}}}
    event))
 
-(k/dry-run
+(v/dry-run
  dispatcher
  nil
  {:user {:permissions #{:pizza/read :system/read}}}
  [:pizza/list])
 
-(k/dispatch
+(v/dispatch
  dispatcher
  nil
  {:user {:permissions #{:pizza/read :system/read}}}
  [:system/actions])
 
-(k/dispatch
+(v/dispatch
  dispatcher
  nil
  {:user {:permissions #{:pizza/read :system/read}}}
@@ -111,7 +111,7 @@
 
  (spit
   ".cpcache/pizza.puml"
-  ((requiring-resolve 'kakkonen.plantuml/transform)
+  ((requiring-resolve 'viesti.plantuml/transform)
    dispatcher
    {:user {:description "Normal User"
            :permissions #{:pizza/read :system/read}}

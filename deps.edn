@@ -1,5 +1,5 @@
 {:paths ["src" "resources"]
- :deps {org.clojure/clojure {:mvn/version "1.11.0-rc1"}
+ :deps {org.clojure/clojure {:mvn/version "1.11.0"}
         metosin/malli {:mvn/version "0.8.3"}}
  :aliases {:test {:extra-paths ["test"]
                   :extra-deps {lambdaisland/kaocha {:mvn/version "1.63.998"}
@@ -11,22 +11,21 @@
                    :ns-default build}
            :shadow {:extra-paths ["app"]
                     :extra-deps {thheller/shadow-cljs {:mvn/version "2.17.5"}}}
-           :jar {:extra-deps {pack/pack.alpha
+           :jar {:extra-deps {pacv/pack.alpha
                               {:git/url "https://github.com/juxt/pack.alpha.git"
                                :sha "b093f79420fef019faf62a75b888b5e10f4e8cc9"}}
                  :main-opts ["-m" "mach.pack.alpha.skinny" "--no-libs"
-                             "--project-path" "kakkonen.jar"]}
+                             "--project-path" "viesti.jar"]}
            :deploy {:extra-deps {deps-deploy/deps-deploy {:mvn/version "RELEASE"}}
                     :main-opts ["-m" "deps-deploy.deps-deploy" "deploy"
-                                "kakkonen.jar"]}
+                                "viesti.jar"]}
            :install {:extra-deps {deps-deploy/deps-deploy {:mvn/version "RELEASE"}}
                      :main-opts ["-m" "deps-deploy.deps-deploy" "install"
-                                 "kakkonen.jar"]}
+                                 "viesti.jar"]}
            :perf {:extra-paths ["perf"]
                   :extra-deps {criterium/criterium {:mvn/version "0.4.6"}
                                com.clojure-goes-fast/clj-async-profiler {:mvn/version "0.5.1"}}
                   :jvm-opts ["-server"
                              "-Xmx4096m"
                              "-Dclojure.compiler.direct-linking=true"]}
-           :clojure-10 {:extra-deps {org.clojure/clojure {:mvn/version "1.10.3"}}}
-           :clojure-11 {}}}
+           :clojure-10 {:extra-deps {org.clojure/clojure {:mvn/version "1.10.3"}}}}}

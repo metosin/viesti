@@ -1,8 +1,8 @@
-(ns kakkonen.plantuml-test
+(ns viesti.plantuml-test
   (:require [clojure.string :as str]
             [clojure.test :refer [deftest is]]
-            [kakkonen.core :as k]
-            [kakkonen.plantuml :as plantuml]))
+            [viesti.core :as v]
+            [viesti.plantuml :as plantuml]))
 
 (defn trim [s] (str/replace (str/trim s) #"\s+" " "))
 
@@ -13,19 +13,19 @@
            :permissions #{:pizza/read :pizza/write :system/read}}})
 
 (def dispatcher
-  (k/dispatcher
+  (v/dispatcher
    {:user/login {:kind :command}
     :pizza/list {:kind :query, :permissions #{:pizza/read}}
     :pizza/get {:kind :query, :permissions #{:pizza/read}}
     :pizza/add {:kind :command, :permissions #{:pizza/write}}
     :pizza/clear {:kind :command, :permissions #{:pizza/write}}
-    :system/actions {:kind :query, :permissions #{:system/read}, :handler k/-actions-handler}
-    :system/available-actions {:kind :query, :permissions #{:system/read}, :handler k/-available-actions-handler}}
-   {:modules [(k/-assoc-type-module)
-              (k/-kind-module {:values #{:command :query}})
-              (k/-permissions-module
+    :system/actions {:kind :query, :permissions #{:system/read}, :handler v/-actions-handler}
+    :system/available-actions {:kind :query, :permissions #{:system/read}, :handler v/-available-actions-handler}}
+   {:modules [(v/-assoc-type-module)
+              (v/-kind-module {:values #{:command :query}})
+              (v/-permissions-module
                {:permissions (->> roles (mapcat (comp :permissions val)) (set))})
-              (k/-invoke-handler-module)]}))
+              (v/-invoke-handler-module)]}))
 
 (set (mapcat (comp :permissions val) roles))
 

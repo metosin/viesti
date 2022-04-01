@@ -1,4 +1,4 @@
-(ns kakkonen.core
+(ns viesti.core
   (:require [clojure.set :as set]
             [malli.core :as m]
             [malli.util :as mu]))
