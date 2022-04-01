@@ -61,7 +61,7 @@
               ;; guards
               (v/-permissions-module
                {:permissions #{:pizza/read :pizza/write :system/read :system/write}
-                :get-permissions #(-> % :user :permissions (or #{}))})
+                :get-permissions (fn [_ ctx _] (-> ctx :user :permissions (or #{})))})
               (v/-validate-input-module)
               (v/-validate-output-module)
               ;; invoke

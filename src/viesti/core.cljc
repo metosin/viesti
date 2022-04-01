@@ -120,19 +120,37 @@
                       (assoc :handler handler)
                       (assoc :output (m/form schema))))))})
 
-(defn -permissions-module [{:keys [required permissions get-permissions] :or {get-permissions :permissions}}]
+(defn -permissions-module [{:keys [required permissions get-permissions]
+                            :or {get-permissions (fn [_ ctx _] (:permissions ctx))}}]
   {:name '-permissions-module
    :schema [:map [:permissions (if-not required {:optional true}) [:set (into [:enum] permissions)]]]
    :compile (fn [type {:keys [handler permissions] :as data} _]
               (when permissions
                 (let [handler (fn [env ctx data]
-                                (let [user-permissions (get-permissions ctx)]
+                                (let [user-permissions (get-permissions env ctx data)]
                                   (let [missing (set/difference permissions user-permissions)]
                                     (if (seq missing)
                                       (-fail! ::missing-permissions {:permissions user-permissions
                                                                      :expected permissions
                                                                      :missing missing
                                                                      :type type})
+                                      (handler env ctx data)))))]
+                  (assoc data :handler handler))))})
+
+(defn -features-module [{:keys [required features get-features]
+                         :or {get-features (fn [env _ _] (:features env))}}]
+  {:name '-features-module
+   :schema [:map [:features (if-not required {:optional true}) [:set (into [:enum] features)]]]
+   :compile (fn [type {:keys [handler features] :as data} _]
+              (when features
+                (let [handler (fn [env ctx data]
+                                (let [env-features (get-features env ctx data)]
+                                  (let [missing (set/difference features env-features)]
+                                    (if (seq missing)
+                                      (-fail! ::missing-features {:features env-features
+                                                                  :expected features
+                                                                  :missing missing
+                                                                  :type type})
                                       (handler env ctx data)))))]
                   (assoc data :handler handler))))})
 

@@ -73,6 +73,7 @@
 (deftest custom-dispatcher-test
   (let [d (v/dispatcher
            {::read {:kind :query
+                    :features #{:feature/a}
                     :permissions #{:test/read}
                     :handler (fn [_ _ _] "read")}
             ::write {:kind :query
@@ -85,9 +86,12 @@
            {:modules [(v/-assoc-type-module)
                       (v/-documentation-module)
                       (v/-kind-module {:values #{:command :query}})
+                      (v/-features-module {:features #{:feature/a}
+                                           :required false
+                                           :get-features (fn [env _ _] (-> env :features (or #{})))})
                       (v/-permissions-module {:permissions #{:test/read :test/write}
                                               :required false
-                                              :get-permissions #(-> % :user :permissions (or #{}))})
+                                              :get-permissions (fn [_ ctx _] (-> ctx :user :permissions (or #{})))})
                       (v/-validate-input-module)
                       (v/-validate-output-module)
                       (v/-invoke-handler-module)]})]
@@ -98,48 +102,67 @@
                       [:handler {:optional true} v/Handle]
                       [:description {:optional true} :string]
                       [:kind [:enum :command :query]]
+                      [:features {:optional true} [:set [:enum :feature/a]]]
                       [:permissions {:optional true} [:set [:enum :test/read :test/write]]]
                       [:input {:optional true} :any]
                       [:output {:optional true} :any]])
              (m/form (v/-schema d)))))
 
     (testing "user with read permissions"
-      (let [ctx {:user {:permissions #{:test/read}}}]
+      (let [env {:features #{:feature/a}}
+            ctx {:user {:permissions #{:test/read}}}]
+
         (testing "can dispatch to read"
-          (is (nil? (v/check d nil ctx [::read])))
-          (is (nil? (v/dry-run d nil ctx [::read])))
-          (is (= "read" (v/dispatch d nil ctx [::read]))))
+          (is (nil? (v/check d env ctx [::read])))
+          (is (nil? (v/dry-run d env ctx [::read])))
+          (is (= "read" (v/dispatch d env ctx [::read]))))
+
         (testing "can't dispatch to write"
           (is (= {:data {:expected #{:test/write}
                          :type ::write
                          :missing #{:test/write}
                          :permissions #{:test/read}}
                   :type ::v/missing-permissions}
-                 (v/check d nil ctx [::write])))
+                 (v/check d env ctx [::write])))
           (is (= {:data {:expected #{:test/write}
                          :type ::write
                          :missing #{:test/write}
                          :permissions #{:test/read}}
                   :type ::v/missing-permissions}
-                 (v/dry-run d nil ctx [::write])))
+                 (v/dry-run d env ctx [::write])))
           (is (thrown?
                #?(:clj Exception, :cljs js/Error)
-               (v/dispatch d nil ctx [::write]))))
+               (v/dispatch d env ctx [::write]))))
 
         (testing "list actions"
           (is (= {::available {:kind :query, ::v/type ::available}
                   ::list {:kind :query, ::v/type ::list}
-                  ::read {:kind :query, ::v/type ::read, :permissions #{:test/read}}
+                  ::read {:kind :query, ::v/type ::read, :features #{:feature/a} :permissions #{:test/read}}
                   ::write {:kind :query, ::v/type ::write, :permissions #{:test/write}}}
-                 (v/dispatch d nil ctx [::list]))))
+                 (v/dispatch d env ctx [::list]))))
 
         (testing "list available commands"
-          (is (= {::available nil
-                  ::list nil
-                  ::read nil
-                  ::write {:data {:expected #{:test/write}
-                                  :type ::write
-                                  :missing #{:test/write}
-                                  :permissions #{:test/read}}
-                           :type ::v/missing-permissions}}
-                 (v/dispatch d nil ctx [::available]))))))))
+          (testing "all good"
+            (is (= {::available nil
+                    ::list nil
+                    ::read nil
+                    ::write {:data {:expected #{:test/write}
+                                    :type ::write
+                                    :missing #{:test/write}
+                                    :permissions #{:test/read}}
+                             :type ::v/missing-permissions}}
+                   (v/dispatch d env ctx [::available]))))
+          (testing "missing feature flag"
+            (is (= {::available nil
+                    ::list nil
+                    ::read {:data {:expected #{:feature/a}
+                                   :features #{}
+                                   :missing #{:feature/a}
+                                   :type :viesti.core-test/read}
+                            :type ::v/missing-features}
+                    ::write {:data {:expected #{:test/write}
+                                    :type ::write
+                                    :missing #{:test/write}
+                                    :permissions #{:test/read}}
+                             :type ::v/missing-permissions}}
+                   (v/dispatch d nil ctx [::available])))))))))
