@@ -21,10 +21,10 @@
   (testing "accumulated schema"
     (is (= (m/form [:map
                     {:closed true}
-                    [:handler {:optional true} v/Handle]
                     [:description {:optional true} :string]
                     [:input {:optional true} :any]
-                    [:output {:optional true} :any]])
+                    [:output {:optional true} :any]
+                    [:handler {:optional true} v/Handler]])
            (m/form (v/-schema d)))))
 
   (testing "types"
@@ -94,18 +94,18 @@
                                               :get-permissions (fn [_ ctx _] (-> ctx :user :permissions (or #{})))})
                       (v/-validate-input-module)
                       (v/-validate-output-module)
-                      (v/-invoke-handler-module)]})]
+                      (v/-handler-module)]})]
 
     (testing "accumulated schema"
       (is (= (m/form [:map
                       {:closed true}
-                      [:handler {:optional true} v/Handle]
                       [:description {:optional true} :string]
                       [:kind [:enum :command :query]]
                       [:features {:optional true} [:set [:enum :feature/a]]]
                       [:permissions {:optional true} [:set [:enum :test/read :test/write]]]
                       [:input {:optional true} :any]
-                      [:output {:optional true} :any]])
+                      [:output {:optional true} :any]
+                      [:handler {:optional true} v/Handler]])
              (m/form (v/-schema d)))))
 
     (testing "user with read permissions"

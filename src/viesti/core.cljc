@@ -26,8 +26,8 @@
 (def MapMessage (m/schema [:map [:type Type] [:data Data]]))
 (def Context (m/schema [:maybe :map]))
 (def Response (m/schema :any))
-(def Handle (m/schema [:=> [:cat Env Context Message] Response]))
-(def Handler (m/schema [:map {:closed true} [:handler {:optional true} Handle]]))
+(def Handler (m/schema [:=> [:cat Env Context Message] Response]))
+(def MessageHandler (m/schema [:map {:closed true}]))
 
 ;;
 ;; Impl
@@ -40,7 +40,7 @@
 (defn -nil-handler [_env _ctx _data])
 
 (defn -compile [type data {:keys [modules] :as options}]
-  (reduce (fn [data {:keys [compile]}] (or (if compile (compile type data options)) data))
+  (reduce (fn [data {:keys [compile]}] (or (when compile (compile type data options)) data))
           (update data :handler (fnil identity -nil-handler))
           (reverse modules)))
 
@@ -62,14 +62,16 @@
 ;; Modules
 ;;
 
-(defn -invoke-handler-module
-  ([] (-invoke-handler-module nil))
-  ([{:keys [dispatch]}]
-   {:name '-invoke-handler-module
-    :compile (fn [_ {:keys [handler] :as data} _]
-               (assoc data :handler (fn [env ctx data]
-                                      (let [f (if (::invoke ctx) (or dispatch handler) -nil-handler)]
-                                        (f env ctx data)))))}))
+(defn -handler-module
+  ([] (-handler-module nil))
+  ([{:keys [handler]}]
+   {:name '-handler-module
+    :schema [:map [:handler {:optional true} Handler]]
+    :compile (fn [type data options]
+               (let [handler (if handler (handler type data options) (:handler data))]
+                 (assoc data :handler (fn [env ctx data]
+                                        (let [f (if (::invoke ctx) handler -nil-handler)]
+                                          (f env ctx data))))))}))
 
 (defn -assoc-type-module []
   {:name '-assoc-type-module
@@ -175,7 +177,7 @@
              (-documentation-module)
              (-validate-input-module)
              (-validate-output-module)
-             (-invoke-handler-module)]})
+             (-handler-module)]})
 
 ;;
 ;; Public API
@@ -186,7 +188,7 @@
 (defn dispatcher
   ([actions] (dispatcher actions (-default-options)))
   ([actions {:keys [modules] :as options}]
-   (let [schema (->> modules (keep :schema) (reduce mu/merge Handler))]
+   (let [schema (->> modules (keep :schema) (reduce mu/merge MessageHandler))]
      (when-let [explanation (m/explain [:map-of Type schema] actions)]
        (-fail! ::invalid-actions {:explanation explanation}))
      (let [actions (reduce-kv (fn [acc key data] (assoc acc key (-compile key data options))) {} actions)

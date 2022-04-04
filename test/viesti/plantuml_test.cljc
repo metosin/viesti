@@ -25,7 +25,7 @@
               (v/-kind-module {:values #{:command :query}})
               (v/-permissions-module
                {:permissions (->> roles (mapcat (comp :permissions val)) (set))})
-              (v/-invoke-handler-module)]}))
+              (v/-handler-module)]}))
 
 (set (mapcat (comp :permissions val) roles))
 
