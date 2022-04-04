@@ -40,9 +40,7 @@
 (defn -nil-handler [_env _ctx _data])
 
 (defn -compile [type data {:keys [modules] :as options}]
-  (reduce (fn [data {:keys [compile]}] (or (when compile (compile type data options)) data))
-          (update data :handler (fnil identity -nil-handler))
-          (reverse modules)))
+  (reduce (fn [data {:keys [compile name]}] (or (when compile (compile type data options)) data)) data modules))
 
 (defn -ctx [ctx dispatcher validate invoke]
   (-> ctx (assoc ::dispatcher dispatcher) (assoc ::validate validate) (assoc ::invoke invoke)))
@@ -62,16 +60,17 @@
 ;; Modules
 ;;
 
-(defn -handler-module
-  ([] (-handler-module nil))
-  ([{:keys [handler]}]
-   {:name '-handler-module
-    :schema [:map [:handler {:optional true} Handler]]
-    :compile (fn [type data options]
-               (let [handler (if handler (handler type data options) (:handler data))]
-                 (assoc data :handler (fn [env ctx data]
-                                        (let [f (if (::invoke ctx) handler -nil-handler)]
-                                          (f env ctx data))))))}))
+(defn -handler-module []
+  {:name '-handler-module
+   :schema [:map [:handler {:optional true} Handler]]
+   :compile (fn [_ {:keys [handler ::middleware] :as data} _]
+              (let [wrap (if middleware (apply comp middleware) identity)
+                    handler (fn [env ctx data]
+                              (when (and (::invoke ctx) handler)
+                                (handler env ctx data)))]
+                (-> data
+                    (dissoc ::middleware)
+                    (assoc :handler (wrap handler)))))})
 
 (defn -assoc-type-module []
   {:name '-assoc-type-module
@@ -90,71 +89,75 @@
 (defn -validate-input-module []
   {:name '-validate-input-module
    :schema [:map [:input {:optional true} :any]]
-   :compile (fn [type {:keys [input handler] :as data} _]
+   :compile (fn [type {:keys [input] :as data} _]
               (when input
                 (let [schema (m/schema input)
                       validate (m/validator schema)
                       explain (m/explainer schema)
-                      handler (fn [env ctx data]
-                                (when (and (::validate ctx) (not (validate data)))
-                                  (-fail! ::input-schema-error {:type type, :explanation (explain data)}))
-                                (handler env ctx data))]
+                      wrap (fn [handler]
+                             (fn [env ctx data]
+                               (when (and (::validate ctx) (not (validate data)))
+                                 (-fail! ::input-schema-error {:type type, :explanation (explain data)}))
+                               (handler env ctx data)))]
                   (-> data
-                      (assoc :handler handler)
+                      (update ::middleware (fnil conj [wrap]))
                       (assoc :input (m/form schema))))))})
 
 (defn -validate-output-module []
   {:name '-validate-output-module
    :schema [:map [:output {:optional true} :any]]
-   :compile (fn [type {:keys [output handler] :as data} _]
+   :compile (fn [type {:keys [output] :as data} _]
               (when output
                 (let [schema (m/schema output)
                       validate (m/validator schema)
                       explain (m/explainer schema)
-                      handler (fn [env ctx data]
-                                (if (::invoke ctx)
-                                  (let [response (handler env ctx data)]
-                                    (when-not (validate response)
-                                      (-fail! ::output-schema-error {:type type, :explanation (explain response)}))
-                                    response)
-                                  (handler env ctx data)))]
+                      wrap (fn [handler]
+                             (fn [env ctx data]
+                               (if (::invoke ctx)
+                                 (let [response (handler env ctx data)]
+                                   (when-not (validate response)
+                                     (-fail! ::output-schema-error {:type type, :explanation (explain response)}))
+                                   response)
+                                 (handler env ctx data))))]
                   (-> data
-                      (assoc :handler handler)
+                      (update ::middleware (fnil conj [wrap]))
                       (assoc :output (m/form schema))))))})
 
 (defn -permissions-module [{:keys [required permissions get-permissions]
                             :or {get-permissions (fn [_ ctx _] (:permissions ctx))}}]
   {:name '-permissions-module
-   :schema [:map [:permissions (if-not required {:optional true}) [:set (into [:enum] permissions)]]]
-   :compile (fn [type {:keys [handler permissions] :as data} _]
+   :schema [:map [:permissions (when-not required {:optional true}) [:set (into [:enum] permissions)]]]
+   :compile (fn [type {:keys [permissions] :as data} _]
               (when permissions
-                (let [handler (fn [env ctx data]
-                                (let [user-permissions (get-permissions env ctx data)]
-                                  (let [missing (set/difference permissions user-permissions)]
-                                    (if (seq missing)
-                                      (-fail! ::missing-permissions {:permissions user-permissions
-                                                                     :expected permissions
-                                                                     :missing missing
-                                                                     :type type})
-                                      (handler env ctx data)))))]
-                  (assoc data :handler handler))))})
+                (let [wrap (fn [handler]
+                             (fn [env ctx data]
+                               (let [user-permissions (get-permissions env ctx data)]
+                                 (let [missing (set/difference permissions user-permissions)]
+                                   (if (seq missing)
+                                     (-fail! ::missing-permissions {:permissions user-permissions
+                                                                    :expected permissions
+                                                                    :missing missing
+                                                                    :type type})
+                                     (handler env ctx data))))))]
+                  (update data ::middleware (fnil conj [wrap])))))})
 
 (defn -features-module [{:keys [required features get-features]
                          :or {get-features (fn [env _ _] (:features env))}}]
   {:name '-features-module
-   :schema [:map [:features (if-not required {:optional true}) [:set (into [:enum] features)]]]
-   :compile (fn [type {:keys [handler features] :as data} _]
+   :schema [:map [:features (when-not required {:optional true}) [:set (into [:enum] features)]]]
+   :compile (fn [type {:keys [features] :as data} _]
               (when features
-                (let [handler (fn [env ctx data]
-                                (let [env-features (get-features env ctx data)]
-                                  (let [missing (set/difference features env-features)]
-                                    (if (seq missing)
-                                      (-fail! ::missing-features {:features env-features
-                                                                  :expected features
-                                                                  :missing missing
-                                                                  :type type})
-                                      (handler env ctx data)))))]
-                  (assoc data :handler handler))))})
+                (let [wrap (fn [handler]
+                             (fn [env ctx data]
+                               (let [env-features (get-features env ctx data)]
+                                 (let [missing (set/difference features env-features)]
+                                   (if (seq missing)
+                                     (-fail! ::missing-features {:features env-features
+                                                                 :expected features
+                                                                 :missing missing
+                                                                 :type type})
+                                     (handler env ctx data))))))]
+                  (update data ::middleware (fnil conj [wrap])))))})
 
 ;;
 ;; Default Handlers
