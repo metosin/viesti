@@ -100,7 +100,7 @@
                                  (-fail! ::input-schema-error {:type type, :explanation (explain data)}))
                                (handler env ctx data)))]
                   (-> data
-                      (update ::middleware (fnil conj [wrap]))
+                      (update ::middleware (fnil conj []) wrap)
                       (assoc :input (m/form schema))))))})
 
 (defn -validate-output-module []
@@ -120,7 +120,7 @@
                                    response)
                                  (handler env ctx data))))]
                   (-> data
-                      (update ::middleware (fnil conj [wrap]))
+                      (update ::middleware (fnil conj []) wrap)
                       (assoc :output (m/form schema))))))})
 
 (defn -permissions-module [{:keys [required permissions get-permissions]
@@ -139,7 +139,7 @@
                                                                     :missing missing
                                                                     :type type})
                                      (handler env ctx data))))))]
-                  (update data ::middleware (fnil conj [wrap])))))})
+                  (update data ::middleware (fnil conj []) wrap))))})
 
 (defn -features-module [{:keys [required features get-features]
                          :or {get-features (fn [env _ _] (:features env))}}]
@@ -157,7 +157,14 @@
                                                                  :missing missing
                                                                  :type type})
                                      (handler env ctx data))))))]
-                  (update data ::middleware (fnil conj [wrap])))))})
+                  (update data ::middleware (fnil conj []) wrap))))})
+
+;;
+;; Predicates
+;;
+
+(defn missing-permissions? [error] (= (:type error) ::missing-permissions))
+(defn missing-features? [error] (= (:type error) ::missing-features))
 
 ;;
 ;; Default Handlers
