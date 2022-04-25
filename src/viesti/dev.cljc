@@ -38,7 +38,8 @@
   ([actions] (dispatcher actions (v/-default-options)))
   ([actions options]
    (let [thrower (pretty/thrower (pretty/-printer {:title "Dispatch Error"}))
-         catch! #(let [{:keys [type data]} (ex-data %)] (thrower type data))
+         catch! #(let [{:keys [type data]} (or (ex-data %) {:type (type %), :data {:message (ex-message %)}})]
+                   (thrower type data))
          dispatcher (try (v/dispatcher actions options)
                          (catch #?(:clj Exception, :cljs js/Error) e (catch! e)))]
      (v/-proxy

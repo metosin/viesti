@@ -1,4 +1,4 @@
-(ns demo.pizza
+(ns demo.demo
   (:require [malli.generator :as mg]
             [malli.util :as mu]
             [viesti.core :as v]
@@ -65,7 +65,7 @@
               (v/-validate-input-module)
               (v/-validate-output-module)
               ;; invoke
-              (v/-invoke-handler-module)]}))
+              (v/-handler-module)]}))
 
 (defn ! [event]
   (v/dispatch

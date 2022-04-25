@@ -20,7 +20,7 @@
 ;;
 
 (def Env (m/schema [:maybe :map]))
-(def Type (m/schema :qualified-keyword))
+(def Type (m/schema :keyword))
 (def Data (m/schema [:maybe :map]))
 (def Message (m/schema [:tuple Type Data]))
 (def MapMessage (m/schema [:map [:type Type] [:data Data]]))
@@ -40,12 +40,17 @@
 (defn -nil-handler [_env _ctx _data])
 
 (defn -compile [type data {:keys [modules] :as options}]
-  (reduce (fn [data {:keys [compile name]}] (or (when compile (compile type data options)) data)) data modules))
+  (reduce (fn [data {:keys [compile]}] (or (when compile (compile type data options)) data)) data modules))
 
 (defn -ctx [ctx dispatcher validate invoke]
   (-> ctx (assoc ::dispatcher dispatcher) (assoc ::validate validate) (assoc ::invoke invoke)))
 
-(defn -event [data] (if (map? data) data {:type (first data), :data (second data)}))
+(defn -event [data]
+  (cond (map? data) data
+        (vector? data) {:type (first data), :data (second data)}
+        :else {:type data}))
+
+(defn -multi-method-actions [mm] (->> (for [[k f] (methods mm)] [k (f k nil)]) (into {})))
 
 (defn -proxy [d f]
   (reify Dispatcher
@@ -193,8 +198,6 @@
 ;; Public API
 ;;
 
-;; TODO: map-first dispatching
-;; TODO: naming of things
 (defn dispatcher
   ([actions] (dispatcher actions (-default-options)))
   ([actions {:keys [modules] :as options}]
