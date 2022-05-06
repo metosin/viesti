@@ -49,8 +49,8 @@
                                    m)) m (dissoc m pk)) @found (dissoc pk))) m)) m mappings))]
     (walk/prewalk (fn [x] (cond-> x (map? x) push)) flow)))
 
-(defn -strip-handlers [flow]
-  (walk/prewalk (fn [x] (cond-> x (map? x) (dissoc :handler))) flow))
+(defn -strip-handlers-and-guards [flow]
+  (walk/prewalk (fn [x] (cond-> x (map? x) (dissoc :handler :guard))) flow))
 
 (defn -schema-forms [flow]
   (walk/prewalk (fn [x] (cond-> x (:input x) (update :input m/form) (:output x) (update :input m/form))) flow))
@@ -94,9 +94,10 @@
   (-flow [this]))
 
 (defprotocol FlowMachine
-  (-initialize [this])
+  (-initialize [this env ctx])
   (-state [this id])
-  (-check-next [this env ctx state])
+  (-available [this env ctx])
+  (-check [this env ctx state])
   (-transition [this env ctx state event])
   (-machine [this]))
 

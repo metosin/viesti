@@ -164,6 +164,18 @@
                                      (handler env ctx data))))))]
                   (update data ::middleware (fnil conj []) wrap))))})
 
+(defn -guard-module []
+  {:name '-guard-module
+   :schema [:map [:guard {:optional true} Handler]]
+   :compile (fn [type {:keys [guard] :as data} _]
+              (when guard
+                (let [wrap (fn [handler]
+                             (fn [env ctx data]
+                               (if-let [result (guard env ctx data)]
+                                 (-fail! ::check-failed {:type type, :result result})
+                                 (handler env ctx data))))]
+                  (update data ::middleware (fnil conj []) wrap))))})
+
 ;;
 ;; Predicates
 ;;
