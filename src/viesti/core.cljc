@@ -8,12 +8,16 @@
 ;;
 
 (defprotocol Dispatcher
+  (-name [this])
   (-types [this])
   (-actions [this])
   (-schema [this])
   (-options [this])
   (-check [this env ctx event])
   (-dispatch [this env ctx event]))
+
+(defprotocol Logger
+  (-log! [this env ctx action type data]))
 
 ;;
 ;; Schemas
@@ -22,12 +26,12 @@
 (def Env (m/schema [:maybe :map]))
 (def Type (m/schema :keyword))
 (def Data (m/schema [:maybe :map]))
-(def Message (m/schema [:tuple Type Data]))
+(def TupleMessage (m/schema [:tuple Type Data]))
 (def MapMessage (m/schema [:map [:type Type] [:data Data]]))
 (def Context (m/schema [:maybe :map]))
 (def Response (m/schema :any))
-(def Handler (m/schema [:=> [:cat Env Context Message] Response]))
-(def MessageHandler (m/schema [:map {:closed true}]))
+(def Handler (m/schema [:=> [:cat Env Context TupleMessage] Response]))
+(def Action (m/schema [:map {:closed true}]))
 
 ;;
 ;; Impl
@@ -54,6 +58,7 @@
 
 (defn -proxy [d f]
   (reify Dispatcher
+    (-name [_] (-name d))
     (-types [_] (-types d))
     (-actions [_] (-actions d))
     (-schema [_] (-schema d))
@@ -164,6 +169,17 @@
                                      (handler env ctx data))))))]
                   (update data ::middleware (fnil conj []) wrap))))})
 
+(defn -log-module [{:keys [accept logger] :or {accept (constantly true)}}]
+  {:name '-log-module
+   :compile (fn [type action _]
+              (when (accept action)
+                (let [wrap (fn [handler]
+                             (fn [env ctx data]
+                               (when (::invoke ctx)
+                                 (-log! logger env ctx action type data))
+                               (handler env ctx data)))]
+                  (update action ::middleware (fnil conj []) wrap))))})
+
 (defn -guard-module []
   {:name '-guard-module
    :schema [:map [:guard {:optional true} Handler]]
@@ -212,26 +228,27 @@
 
 (defn dispatcher
   ([actions] (dispatcher actions (-default-options)))
-  ([actions {:keys [modules] :as options}]
-   (let [schema (->> modules (keep :schema) (reduce mu/merge MessageHandler))]
+  ([actions {:keys [modules name] :as options}]
+   (let [schema (->> modules (keep :schema) (reduce mu/merge Action))]
      (when-let [explanation (m/explain [:map-of Type schema] actions)]
        (-fail! ::invalid-actions {:explanation explanation}))
-     (let [actions (reduce-kv (fn [acc key data] (assoc acc key (-compile key data options))) {} actions)
-           types (set (keys actions))]
+     (let [type->action (reduce-kv (fn [acc key data] (assoc acc key (-compile key data options))) {} actions)
+           types (set (keys type->action))]
        (reify Dispatcher
+         (-name [_] name)
          (-types [_] types)
-         (-actions [_] actions)
+         (-actions [_] type->action)
          (-schema [_] schema)
          (-options [_] options)
          (-check [_ env ctx event]
            (let [{:keys [type data]} (-event event)]
-             (if-let [action (actions type)]
+             (if-let [action (type->action type)]
                (let [handler (:handler action)]
-                 (try (handler env ctx data) (catch #?(:clj Exception, :cljs js/Error) e (ex-data e))))
+                 (try (handler env ctx data) nil (catch #?(:clj Exception, :cljs js/Error) e (ex-data e))))
                (-fail! ::invalid-action {:type type, :types types}))))
          (-dispatch [_ env ctx event]
            (let [{:keys [type data]} (-event event)]
-             (if-let [action (actions type)]
+             (if-let [action (type->action type)]
                (let [handler (:handler action)]
                  (handler env ctx data))
                (-fail! ::invalid-action {:type type, :types types})))))))))

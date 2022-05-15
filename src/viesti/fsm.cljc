@@ -73,7 +73,7 @@
 (defn -with-dispatcher [flow {:keys [dispatcher] :or {dispatcher v/dispatcher} :as options}]
   (let [f (fn [m]
             (if-let [on (:fsm/on m)]
-              (let [actions (reduce-kv (fn [acc k v] (assoc acc k (assoc (-reduce-map v "fsm" false) :kind :command))) {} on)]
+              (let [actions (reduce-kv (fn [acc k v] (assoc acc k (assoc (-reduce-map v "fsm" false) :kind :signal))) {} on)]
                 (assoc m :fsm/dispatcher (dispatcher actions options)))
               m))]
     (->> flow (-normalize) (-walk-map f))))
