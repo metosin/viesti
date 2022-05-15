@@ -1,4 +1,5 @@
 (ns viesti.core
+  (:refer-clojure :exclude [-name])
   (:require [clojure.set :as set]
             [malli.core :as m]
             [malli.util :as mu]))
