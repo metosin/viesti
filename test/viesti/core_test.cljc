@@ -15,7 +15,12 @@
   (try
     (v/-fail! ::v/kikka)
     (catch #?(:clj Exception, :cljs js/Error) e
-      (is (= ::v/kikka (-> e ex-data :type))))))
+      (is (= ::v/kikka (-> e ex-data :type)))
+      (is (v/-managed? e))))
+  (try
+    (throw (ex-info "non-viesti" {}))
+    (catch #?(:clj Exception, :cljs js/Error) e
+      (is (not (v/-managed? e))))))
 
 (deftest dispatcher-test
   (testing "accumulated schema"

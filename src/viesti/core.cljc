@@ -40,7 +40,9 @@
 
 (defn -fail!
   ([type] (-fail! type nil))
-  ([type data] (throw (ex-info (str type " " (pr-str data)) {:type type, :data data}))))
+  ([type data] (throw (ex-info (str type " " (pr-str data)) ^{::managed true} {:type type, :data data}))))
+
+(defn -managed? [ex] (-> ex ex-data meta ::managed boolean))
 
 (defn -nil-handler [_env _ctx _data])
 
