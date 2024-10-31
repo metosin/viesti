@@ -12,6 +12,6 @@ We are big fans of the [CQRS](https://martinfowler.com/bliki/CQRS.html) pattern.
 
 ## License
 
-Copyright © 2022 Metosin Oy and contributors.
+Copyright © 2022-2024 Metosin Oy and contributors.
 
 Available under the terms of the Eclipse Public License 2.0, see `LICENSE`.
